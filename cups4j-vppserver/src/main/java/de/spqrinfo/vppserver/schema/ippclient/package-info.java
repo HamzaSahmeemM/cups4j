@@ -5,6 +5,6 @@
 // Generated on: 2009.10.14 at 12:03:17 PM MESZ 
 //
 
-@javax.xml.bind.annotation.XmlSchema(namespace = "http://www.vppserver.ethz.ch/schema/ippclient", elementFormDefault = javax.xml.bind.annotation.XmlNsForm.QUALIFIED)
+@jakarta.xml.bind.annotation.XmlSchema(namespace = "http://www.vppserver.ethz.ch/schema/ippclient", elementFormDefault = jakarta.xml.bind.annotation.XmlNsForm.QUALIFIED)
 package de.spqrinfo.vppserver.schema.ippclient;
 

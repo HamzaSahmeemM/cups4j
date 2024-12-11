@@ -1,20 +1,21 @@
 package de.spqrinfo.vppserver.ippclient;
 
-import de.spqrinfo.vppserver.schema.ippclient.AttributeGroup;
-import de.spqrinfo.vppserver.schema.ippclient.AttributeList;
-import de.spqrinfo.vppserver.schema.ippclient.Tag;
-import de.spqrinfo.vppserver.schema.ippclient.TagList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import de.spqrinfo.vppserver.schema.ippclient.AttributeGroup;
+import de.spqrinfo.vppserver.schema.ippclient.AttributeList;
+import de.spqrinfo.vppserver.schema.ippclient.Tag;
+import de.spqrinfo.vppserver.schema.ippclient.TagList;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Unmarshaller;
 
 /**
  * Copyright (C) 2008 ITS of ETH Zurich, Switzerland, Sarah Windler Burri

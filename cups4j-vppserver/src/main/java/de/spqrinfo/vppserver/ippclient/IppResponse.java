@@ -2,16 +2,18 @@ package de.spqrinfo.vppserver.ippclient;
 
 import de.spqrinfo.vppserver.schema.ippclient.*;
 import de.spqrinfo.vppserver.schema.ippclient.Enum;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.xml.bind.JAXBException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
+
+import jakarta.xml.bind.JAXBException;
 
 /**
  * Copyright (C) 2008 ITS of ETH Zurich, Switzerland, Sarah Windler Burri

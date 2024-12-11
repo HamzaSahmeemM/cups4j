@@ -7,7 +7,7 @@
 
 package de.spqrinfo.vppserver.schema.ippclient;
 
-import javax.xml.bind.annotation.*;
+import jakarta.xml.bind.annotation.*;
 
 /**
  * <p>

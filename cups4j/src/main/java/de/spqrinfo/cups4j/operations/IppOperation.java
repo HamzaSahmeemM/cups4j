@@ -15,30 +15,36 @@ package de.spqrinfo.cups4j.operations;
  * <http://www.gnu.org/licenses/>.
  */
 
-import de.spqrinfo.vppserver.ippclient.IppResponse;
-import de.spqrinfo.vppserver.ippclient.IppResult;
-import de.spqrinfo.vppserver.ippclient.IppTag;
-import de.spqrinfo.vppserver.schema.ippclient.Attribute;
-import de.spqrinfo.cups4j.CupsClient;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpVersion;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.InputStreamEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.util.EntityUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.xml.bind.JAXBException;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.SequenceInputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.Map;
+
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.io.HttpClientResponseHandler;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.InputStreamEntity;
+import org.apache.hc.core5.util.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import de.spqrinfo.cups4j.CupsClient;
+import de.spqrinfo.vppserver.ippclient.IppResponse;
+import de.spqrinfo.vppserver.ippclient.IppResult;
+import de.spqrinfo.vppserver.ippclient.IppTag;
+import de.spqrinfo.vppserver.schema.ippclient.Attribute;
+import jakarta.xml.bind.JAXBException;
 
 public abstract class IppOperation {
     protected short operationID = -1; // IPP operation ID
@@ -142,75 +148,78 @@ public abstract class IppOperation {
      * @return result
      * @throws Exception
      */
-    private IppResult sendRequest(URL url, ByteBuffer ippBuf, InputStream documentStream) throws Exception {
-        IppResult ippResult = null;
-        if (ippBuf == null) {
-            return null;
-        }
+ private IppResult sendRequest(URL url, ByteBuffer ippBuf, InputStream documentStream) throws Exception {
+    // Validate input
+    if (ippBuf == null || url == null) {
+        return null;
+    }
 
-        if (url == null) {
-            return null;
-        }
+    // Configure timeouts, protocol version, and connection settings
+    RequestConfig requestConfig = RequestConfig.custom()
+        .setConnectionRequestTimeout(Timeout.ofSeconds(10))   // Connection timeout
+        .setResponseTimeout(Timeout.ofSeconds(10))            // Response timeout
+        .setExpectContinueEnabled(true)                        // Expect-continue enabled
+        .setResponseTimeout(Timeout.ofSeconds(10))               // Socket timeout
+        .build();
 
-        HttpClient client = new DefaultHttpClient();
+    // Create HttpClient with custom configuration
+    try (CloseableHttpClient client = HttpClients.custom()
+        .setDefaultRequestConfig(requestConfig) // Apply requestConfig
+        .build()) {
 
-        // will not work with older versions of CUPS!
-        client.getParams().setParameter("http.protocol.version", HttpVersion.HTTP_1_1);
-        client.getParams().setParameter("http.socket.timeout", new Integer(10000));
-        client.getParams().setParameter("http.connection.timeout", new Integer(10000));
-        client.getParams().setParameter("http.protocol.content-charset", "UTF-8");
-        client.getParams().setParameter("http.method.response.buffer.warnlimit", new Integer(8092));
+        // Construct the full URI
+        URI fullUri = new URI("http://" + url.getHost() + ":" + ippPort + url.getPath());
 
-        // probabaly not working with older CUPS versions
-        client.getParams().setParameter("http.protocol.expect-continue", Boolean.valueOf(true));
+        // Create HttpPost request
+        HttpPost httpPost = new HttpPost(fullUri);
 
-        HttpPost httpPost = new HttpPost(new URI("http://" + url.getHost() + ":" + ippPort) + url.getPath());
-
-        httpPost.getParams().setParameter("http.socket.timeout", new Integer(10000));
-
+        // Prepare IPP request body
         byte[] bytes = new byte[ippBuf.limit()];
         ippBuf.get(bytes);
-
         ByteArrayInputStream headerStream = new ByteArrayInputStream(bytes);
 
-        // If we need to send a document, concatenate InputStreams
-        InputStream inputStream = headerStream;
-        if (documentStream != null) {
-            inputStream = new SequenceInputStream(headerStream, documentStream);
-        }
+        // Combine streams if document stream is present
+        InputStream inputStream = documentStream != null 
+            ? new SequenceInputStream(headerStream, documentStream) 
+            : headerStream;
 
-        // set length to -1 to advice the entity to read until EOF
-        InputStreamEntity requestEntity = new InputStreamEntity(inputStream, -1);
+        // Create input stream entity with content type
+        InputStreamEntity requestEntity = new InputStreamEntity(
+            inputStream, 
+            -1,  // Use -1 to read until EOF
+            ContentType.parse(IPP_MIME_TYPE)
+        );
 
-        requestEntity.setContentType(IPP_MIME_TYPE);
+        // Set the entity to the request
         httpPost.setEntity(requestEntity);
 
-        httpStatusLine = null;
+        // Define response handler
+        HttpClientResponseHandler<byte[]> responseHandler = new HttpClientResponseHandler<>() {
+            @Override
+            public byte[] handleResponse(ClassicHttpResponse response) throws IOException {
+                // Store HTTP status line
+                httpStatusLine = response.getReasonPhrase();
 
-        ResponseHandler<byte[]> handler = new ResponseHandler<byte[]>() {
-            public byte[] handleResponse(HttpResponse response) throws ClientProtocolException, IOException {
+                // Process response entity
                 HttpEntity entity = response.getEntity();
-                httpStatusLine = response.getStatusLine().toString();
-                if (entity != null) {
-                    return EntityUtils.toByteArray(entity);
-                } else {
-                    return null;
-                }
+                return entity != null 
+                    ? EntityUtils.toByteArray(entity) 
+                    : null;
             }
         };
 
-        byte[] result = client.execute(httpPost, handler);
+        // Execute request and get response
+        byte[] result = client.execute(httpPost, responseHandler);
 
+        // Process IPP response
         IppResponse ippResponse = new IppResponse();
-
-        ippResult = ippResponse.getResponse(ByteBuffer.wrap(result));
+        IppResult ippResult = ippResponse.getResponse(ByteBuffer.wrap(result));
         ippResult.setHttpStatusResponse(httpStatusLine);
 
-        // IppResultPrinter.print(ippResult);
-
-        client.getConnectionManager().shutdown();
         return ippResult;
     }
+}
+
 
     /**
      * Removes the port number in the submitted URL
